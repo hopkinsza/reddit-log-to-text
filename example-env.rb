@@ -1,4 +1,5 @@
 # bot session credentials
+print "connecting to reddit..."
 $Session = Redd.it(
 	user_agent: 'Redd:reddit-log-to-txt:v0.0.0',
 	client_id:  '',
@@ -7,6 +8,7 @@ $Session = Redd.it(
 	# username:   '',
 	# password:   ''
 )
+puts " [done]"
 
 # this will change settings on the account you give the bot
 # specifically, :over_18=>true :search_include_over_18=>true
