@@ -5,10 +5,14 @@ require "date"
 # redd reddit session credentials
 # whether or not to include NSFW results
 # which subreddit to log
+# how close 2 posts from same user can be
 $Session
 $Over_18_and_View_NSFW
 $Subreddit
+$Post_Downtime
+print "connecting to reddit..."
 require_relative "env"
+puts " [done]"
 
 ################################################
 # Set account permissions
@@ -16,8 +20,8 @@ require_relative "env"
 print "logged in as "
 begin
 	puts $Session.me.name
-	print "setting account permissions..."
 	if $Over_18_and_View_NSFW
+		print "setting account permissions..."
 		$Session.edit_preferences(:over_18=>true, :search_include_over_18=>true)
 		puts " [done]"
 	end
@@ -44,7 +48,8 @@ def summarize_post(post)
 	str += "\n"
 	#
 	str += post.title + "\n"
-	str += post.selftext
+	str += post.selftext.gsub(/\n/, "")
+	str += "\n\n"
 	return str
 end
 
@@ -53,36 +58,91 @@ end
 # Load file, populate if empty
 ##############################
 # open file or create if it doesn't exist
-file_name = $Subreddit + "-data"
-file = File.open(file_name, "a+")
-
-data = file.read
-usernames = []
-times = []
+File_Name = $Subreddit + "-data"
+def load_data
+	return File.open(File_Name, "a+").read
+end
+data = load_data
 
 if data == ""
-	print "populating ./#{file_name} with 100 initial entries..."
+	print "populating ./#{File_Name} with 100 initial entries..."
 
-	$Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
+	$Session.subreddit($Subreddit).search("*", sort: :new, limit: 100)\
 		.each do |submission|
 		data += summarize_post(submission)
-		#TODO add to usernames[] and times[]
 	end
+	File.write(File_Name, data)
 	puts " [done]"
 else
-	print "./#{file_name} found, loading data..."
+	puts "./#{File_Name} found"
 end
-puts data
 
-# 
-# loop do
-# 	# save to file
-# 	# sleep for 5 minutes (300 seconds)
-# 	sleep 300
-# end
-# 
-# session.subreddit(SUBREDDIT).post_stream do |post|
-# end
+################################################
+# Stream posts. Log to file as they come in,
+# delete if they violate $Post_Downtime
+#######################################
+
+def remove_post_and_pm(post)
+	# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
+	# post.author.send_message(subject: ("r/" + $Subreddit + " post has been removed"),
+	# 						 text: "Your post, \"#{post.title}\", has been removed
+	# 						 for being posted within #{$Post_Downtime} seconds
+	# 						 of your last submission.",
+	# 						 from: nil)
+	# post.remove(spam: false)
+end
+
+def log_post(post)
+	# log post at beginning of file
+	File.open("temp", "w") do |temp|
+		temp.write(summarize_post(post))
+		temp.write(File.read(File_Name))
+		File.delete(File_Name)
+		File.rename("temp", File_Name)
+	end
+end
+
+$Session.subreddit($Subreddit).post_stream do |post|
+	puts "post submitted at #{post.created_utc.to_s}!"
+
+	print "logging..."
+	log_post(post)
+	puts " [done]"
+
+	if $Post_Downtime >= 0
+		print "checking if it violated $Post_Downtime..."
+
+		# gather time, name info on posts from last $Post_Downtime seconds
+		data = load_data
+		data_arr = data.split("\n")
+		times = []
+		names = []
+		for i in 0..data_arr.length
+			if i % 6 == 0
+				names.push data_arr[i]
+			elsif i % 6 == 1
+				times.push data_arr[i]
+				break if post.created_utc.to_i - times[i] >= $Post_Downtime
+			end
+		end
+
+		name = post.author.name
+		violated = false
+		names.each do |n|
+			if n ==  name
+				violated = true
+				break
+			end
+		end
+		if violated
+			remove_post_and_pm(post)
+			puts " [GOTCHA!!!]"
+			puts "rekt post: #{post.title}"
+		else
+			puts "[nope]"
+		end
+	end
+end
 
 # $Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
 # 	.each do |submission|
