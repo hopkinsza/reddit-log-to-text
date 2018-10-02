@@ -13,12 +13,16 @@ require_relative "env"
 ################################################
 # Set account permissions
 #########################
-if $Session.username != ''
+print "logged in as "
+begin
+	puts $Session.me.name
 	print "setting account permissions..."
 	if $Over_18_and_View_NSFW
 		$Session.edit_preferences(:over_18=>true, :search_include_over_18=>true)
+		puts " [done]"
 	end
-	puts " [done]"
+rescue
+	puts "anonymous"
 end
 
 ################################################
@@ -53,8 +57,8 @@ file_name = $Subreddit + "-data"
 file = File.open(file_name, "a+")
 
 data = file.read
-usernames[]
-times[]
+usernames = []
+times = []
 
 if data == ""
 	print "populating ./#{file_name} with 100 initial entries..."
@@ -62,12 +66,12 @@ if data == ""
 	$Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
 		.each do |submission|
 		data += summarize_post(submission)
+		#TODO add to usernames[] and times[]
 	end
 	puts " [done]"
 else
 	print "./#{file_name} found, loading data..."
 end
-
 puts data
 
 # 
