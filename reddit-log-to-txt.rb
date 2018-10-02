@@ -30,8 +30,15 @@ rescue
 end
 
 ################################################
-# Function to summarize posts
-#############################
+# Function to summarize posts, and one for
+# date/time
+###########
+# puts local and utc time based on
+# seconds since epoch
+def local_and_utc(secs)
+	return Time.at(secs).to_datetime.to_s + "; UTC " + DateTime.strptime(secs.to_s, "%s").to_s
+end
+
 # post = Submission in Redd documentation
 def summarize_post(post)
 	# author
@@ -41,10 +48,9 @@ def summarize_post(post)
 	# selftext
 	str = post.author.name + "\n"
 	# time
-	secs = post.created_utc.to_s
-	str += secs + "\n"
-	date_time = DateTime.strptime(secs, "%s")
-	str += Time.at(secs.to_i).to_datetime.to_s + "; UTC " + date_time.to_s
+	secs = post.created_utc.to_i
+	str += secs.to_s + "\n"
+	str += local_and_utc(secs)
 	str += "\n"
 	#
 	str += post.title + "\n"
@@ -52,7 +58,6 @@ def summarize_post(post)
 	str += "\n\n"
 	return str
 end
-
 
 ################################################
 # Load file, populate if empty
@@ -81,7 +86,15 @@ end
 # Stream posts. Log to file as they come in,
 # delete if they violate $Post_Downtime
 #######################################
-
+def log_post(post)
+	# log post at beginning of file
+	File.open("temp", "w") do |temp|
+		temp.write(summarize_post(post))
+		temp.write(File.read(File_Name))
+		File.delete(File_Name)
+		File.rename("temp", File_Name)
+	end
+end
 def remove_post_and_pm(post)
 	# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
 	# post.author.send_message(subject: ("r/" + $Subreddit + " post has been removed"),
@@ -92,18 +105,8 @@ def remove_post_and_pm(post)
 	# post.remove(spam: false)
 end
 
-def log_post(post)
-	# log post at beginning of file
-	File.open("temp", "w") do |temp|
-		temp.write(summarize_post(post))
-		temp.write(File.read(File_Name))
-		File.delete(File_Name)
-		File.rename("temp", File_Name)
-	end
-end
-
 $Session.subreddit($Subreddit).post_stream do |post|
-	puts "post submitted at #{post.created_utc.to_s}!"
+	puts "post submitted at #{local_and_utc(post.created_utc.to_i)}!"
 
 	print "logging..."
 	log_post(post)
@@ -112,17 +115,20 @@ $Session.subreddit($Subreddit).post_stream do |post|
 	if $Post_Downtime >= 0
 		print "checking if it violated $Post_Downtime..."
 
+		post_name = post.author.name
+		post_time = post.created_utc.to_i
 		# gather time, name info on posts from last $Post_Downtime seconds
-		data = load_data
 		data_arr = data.split("\n")
 		times = []
 		names = []
 		for i in 0..data_arr.length
 			if i % 6 == 0
-				names.push data_arr[i]
+				pushme = data_arr[i]
+				names.push pushme
 			elsif i % 6 == 1
-				times.push data_arr[i]
-				break if post.created_utc.to_i - times[i] >= $Post_Downtime
+				pushme = data_arr[i].to_i
+				times.push pushme
+				break if post_time - pushme >= $Post_Downtime
 			end
 		end
 
@@ -138,9 +144,12 @@ $Session.subreddit($Subreddit).post_stream do |post|
 			remove_post_and_pm(post)
 			puts " [GOTCHA!!!]"
 			puts "rekt post: #{post.title}"
+			puts "by #{name}"
 		else
-			puts "[nope]"
+			puts " [nope]"
 		end
+		puts
+		data = load_data
 	end
 end
 
