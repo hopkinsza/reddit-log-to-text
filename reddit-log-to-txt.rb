@@ -136,12 +136,14 @@ loop do
 	# check logged posts for $Post_Downtime violations
 	if $Post_Downtime >= 0
 		data_arr = File.readlines(File_Name)
-		# get info from necessary logged posts to test
+		# get info from necessary logged posts to test,
+		# sorted oldest first
 		checkline = File.read(File_Name + "-line").to_i
 		names = []
 		times = []
 		ids   = []
-		for i in 0..checkline
+		i = checkline
+		while i >= 0
 			if i % 7 == 0
 				names.push data_arr[i]
 			elsif i % 7 == 1
@@ -149,9 +151,11 @@ loop do
 			elsif i % 7 == 2
 				ids.push data_arr[i]
 			end
+			i -= 1
 		end
+
 		# test them, remove post & remove from arrays
-		# if violates $Post_Downtime
+		# if it violates $Post_Downtime
 		for i in 0...names.length
 			for j in i...names.length
 				next if i == j
@@ -164,6 +168,7 @@ loop do
 				end
 			end
 		end
+
 		# set File_Name + "-line" again
 		begin
 		last_logged_time = data_arr[1]
