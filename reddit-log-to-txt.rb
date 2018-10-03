@@ -101,90 +101,71 @@ def remove_post_and_pm(post)
 	# 						 from: nil)
 	# post.remove(spam: false)
 end
-def get_names_and_times_in_downtime(data_arr)
-	data_arr = data.split("\n")
+def get_names_in_downtime(data_arr)
+	#TODO wtf is going on here
 	names = []
-	times = []
 	for i in 0..data_arr.length
 		if i % 7 == 0
 			names.push data_arr[i]
 		elsif i % 7 == 1
-			times.push data_arr[i].to_i
-			break if post_time - pushme >= $Post_Downtime
+			time = data_arr[i].to_i
+			break if post_time - time >= $Post_Downtime
 		end
 	end
 
-	return names, times
+	return names
 end
 
 # repeats every 5 minites, infinitely
+print "fetching posts..."
 loop do
-	sleep 300
-	data = load_data
-	data_arr = data.split("\n")
+	data_arr = File.read(File_Name).split("\n")
 
-	# get posts since latest logged post
+	# data of latest logged post
 	latest_name = data_arr[0]
 	latest_time = data_arr[1]
+	latest_id   = data_arr[2]
 
-	$Session.subreddit($Subreddit).search('*', sort: :new, limit: 1)\
+	# violating posts *within this post grab* will be
+	# removed, if $Post_Downtime is set. Otherwise, this
+	# variable is not used.
+	unique_names = []
+	unique_times = []
+	# get posts since latest logged post, oldest first
+	$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
 		.reverse_each do |post|
-		#TODO log posts
-		if $Post_Downtime >= 0
-			#TODO check #Post_Downtime violation
-			names_in_downtime = get_names_in_downtime(data_arr)
-			times_in_downtime = get_times_in_downtime(data_arr)
-		end
+		log_to_top_of_file(summarize_post(post))
+
+		# TODO redo this completely in a smarter way. we will log the files first,
+		# then check the FILE for $Post_Downtime violations.
+		# if $Post_Downtime >= 0
+		# 	post_name = post.author.name
+		# 	#TODO check $Post_Downtime violation
+		# 	# check against posts from this post grab
+		# 	unique = true
+		# 	for i in 0..unique_names.length
+		# 		if post_name == unique_names[i]
+		# 			unique = false
+		# 		end
+		# 	end
+		# 	if unique
+		# 		if post
+		# 		unique_names.push post_name
+		# 		unique_times.push post.created_utc.to_i
+		# 	end
+
+		# 	#TODO
+		# 	# check against already logged posts
+		# 	names_in_downtime = get_names_in_downtime(data_arr)
+		# 	for i in 0..names_in_downtime.length
+		# 		if 
+		# 		end
+		# 	end
+		# end
 	end
+	sleep 300
 end
-
-$Session.subreddit($Subreddit).post_stream do |post|
-	puts "post submitted at #{local_and_utc(post.created_utc.to_i)}!"
-
-	print "logging..."
-	log_post(post)
-	puts " [done]"
-
-	if $Post_Downtime >= 0
-		print "checking if it violated $Post_Downtime..."
-
-		post_name = post.author.name
-		post_time = post.created_utc.to_i
-		# gather time, name info on posts from last $Post_Downtime seconds
-		data_arr = data.split("\n")
-		times = []
-		names = []
-		for i in 0..data_arr.length
-			if i % 6 == 0
-				pushme = data_arr[i]
-				names.push pushme
-			elsif i % 6 == 1
-				pushme = data_arr[i].to_i
-				times.push pushme
-				break if post_time - pushme >= $Post_Downtime
-			end
-		end
-
-		name = post.author.name
-		violated = false
-		names.each do |n|
-			if n ==  name
-				violated = true
-				break
-			end
-		end
-		if violated
-			remove_post_and_pm(post)
-			puts " [GOTCHA!!!]"
-			puts "rekt post: #{post.title}"
-			puts "by #{name}"
-		else
-			puts " [nope]"
-		end
-		puts
-		data = load_data
-	end
-end
+puts " [done]"
 
 # $Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
 # 	.each do |submission|
