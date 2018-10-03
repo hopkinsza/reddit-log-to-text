@@ -31,8 +31,8 @@ end
 
 ################################################
 # Function to summarize posts, and one for
-# date/time
-###########
+# formatted date/time
+#####################
 # puts local and utc time based on
 # seconds since epoch
 def local_and_utc(secs)
@@ -43,16 +43,15 @@ end
 def summarize_post(post)
 	# author
 	# [time in seconds]
+	# id
 	# [LocalTime]; UTC [Time]
 	# title
-	# selftext
+	# selftext on one line
 	str = post.author.name + "\n"
-	# time
 	secs = post.created_utc.to_i
 	str += secs.to_s + "\n"
-	str += local_and_utc(secs)
-	str += "\n"
-	#
+	# str += post.id + "\n"
+	str += local_and_utc(secs) + "\n"
 	str += post.title + "\n"
 	str += post.selftext.gsub(/\n/, "")
 	str += "\n\n"
@@ -83,18 +82,26 @@ else
 end
 
 ################################################
-# Stream posts. Log to file as they come in,
+# Load posts every 3 minutes, log them,
 # delete if they violate $Post_Downtime
 #######################################
-def log_post(post)
-	# log post at beginning of file
+def log_to_top_of_file(text)
 	File.open("temp", "w") do |temp|
-		temp.write(summarize_post(post))
+		temp.write(text)
 		temp.write(File.read(File_Name))
 		File.delete(File_Name)
 		File.rename("temp", File_Name)
 	end
 end
+# def log_post(post)
+# 	# log post at top of file
+# 	File.open("temp", "w") do |temp|
+# 		temp.write(summarize_post(post))
+# 		temp.write(File.read(File_Name))
+# 		File.delete(File_Name)
+# 		File.rename("temp", File_Name)
+# 	end
+# end
 def remove_post_and_pm(post)
 	# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
 	# post.author.send_message(subject: ("r/" + $Subreddit + " post has been removed"),
@@ -103,6 +110,42 @@ def remove_post_and_pm(post)
 	# 						 of your last submission.",
 	# 						 from: nil)
 	# post.remove(spam: false)
+end
+def get_names_and_times_in_downtime(data_arr)
+	data_arr = data.split("\n")
+	names = []
+	times = []
+	for i in 0..data_arr.length
+		if i % 6 == 0
+			names.push data_arr[i]
+		elsif i % 6 == 1
+			times.push data_arr[i].to_i
+			break if post_time - pushme >= $Post_Downtime
+		end
+	end
+
+	return names, times
+end
+
+# repeats every 5 minites, infinitely
+loop do
+	sleep 300
+	data = load_data
+	data_arr = data.split("\n")
+
+	# get posts since latest logged post
+	latest_name = data_arr[0]
+	latest_time = data_arr[1]
+
+	$Session.subreddit($Subreddit).search('*', sort: :new, limit: 1)\
+		.reverse_each do |post|
+
+	end
+
+	if $Post_Downtime >= 0
+		names_in_downtime = get_names_in_downtime(data_arr)
+		times_in_downtime = get_times_in_downtime(data_arr)
+	end
 end
 
 $Session.subreddit($Subreddit).post_stream do |post|
@@ -157,12 +200,4 @@ end
 # 	.each do |submission|
 # 	puts
 # 	puts summarize_post(submission)
-# end
-
-# session.subreddit(SUBREDDIT).comments.stream do |comment|
-#   if comment.body.include?('roll a dice')
-#     comment.reply("It's a #{rand(1..6)}!")
-#   elsif comment.body.include?('flip a coin')
-#     comment.reply("It's a #{%w(heads tails).sample}!")
-#   end
 # end
