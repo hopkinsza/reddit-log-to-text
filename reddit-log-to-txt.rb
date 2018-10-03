@@ -68,9 +68,10 @@ File_Name = $Subreddit + "-data"
 if File.exist?(File_Name)
 	puts "./#{File_Name} found"
 else
-	print "populating ./#{File_Name} with 100 initial entries..."
+	print "populating ./#{File_Name} with up to 100 initial entries..."
 	arr_to_write = []
-	$Session.subreddit($Subreddit).search("*", sort: :new, limit: 100)\
+
+	$Session.subreddit($Subreddit).search('all', sort: :new, limit: 100)\
 		.each do |submission|
 		arr_to_write.push summarize_post(submission)
 	end
@@ -117,18 +118,20 @@ def remove_post_and_pm(post)
 end
 
 # repeats every 5 minutes, infinitely
+# (until stopped with ^C)
 loop do
 	print "fetching posts..."
 
 	# log posts since latest logged post, oldest first
-	{
+	begin
+	latest_id = data_arr[2]
 	log_me = ""
-	$Session.subreddit($Subreddit).search('all', sort: :new, after: data_arr[2])\
+	$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
 		.reverse_each do |post|
 		log_me += summarize_post(post)
 	end
 	log_to_top_of_file(File_Name, log_me)
-	}
+	end
 
 	# check logged posts for $Post_Downtime violations
 	if $Post_Downtime >= 0
@@ -162,7 +165,7 @@ loop do
 			end
 		end
 		# set File_Name + "-line" again
-		{
+		begin
 		last_logged_time = data_arr[1]
 		new_line = 0
 		for i in 0...data_arr.length
@@ -174,7 +177,7 @@ loop do
 			# default to first ever logged post
 			new_line = data_arr.length - 1
 		end
-		}
+		end
 		File.write(File_Name + "-line", new_line.to_s)
 	end
 
