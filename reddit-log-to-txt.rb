@@ -19,6 +19,7 @@ puts " [done]"
 #########################
 print "logged in as "
 begin
+	# this will crash if not logged in
 	puts $Session.me.name
 	if $Over_18_and_View_NSFW
 		print "setting account permissions..."
@@ -50,7 +51,7 @@ def summarize_post(post)
 	str = post.author.name + "\n"
 	secs = post.created_utc.to_i
 	str += secs.to_s + "\n"
-	# str += post.id + "\n"
+	str += post.id + "\n"
 	str += local_and_utc(secs) + "\n"
 	str += post.title + "\n"
 	str += post.selftext.gsub(/\n/, "")
@@ -61,24 +62,22 @@ end
 ################################################
 # Load file, populate if empty
 ##############################
-# open file or create if it doesn't exist
+# open file or create & populate if it doesn't exist
 File_Name = $Subreddit + "-data"
-def load_data
-	return File.open(File_Name, "a+").read
-end
-data = load_data
 
-if data == ""
+if File.exist?(File_Name)
+	puts "./#{File_Name} found"
+else
 	print "populating ./#{File_Name} with 100 initial entries..."
-
+	str = ""
 	$Session.subreddit($Subreddit).search("*", sort: :new, limit: 100)\
 		.each do |submission|
-		data += summarize_post(submission)
+		str += summarize_post(submission)
 	end
-	File.write(File_Name, data)
+	File.open(File_Name, "a") do |f|
+		f.write(str)
+	end
 	puts " [done]"
-else
-	puts "./#{File_Name} found"
 end
 
 ################################################
@@ -93,15 +92,6 @@ def log_to_top_of_file(text)
 		File.rename("temp", File_Name)
 	end
 end
-# def log_post(post)
-# 	# log post at top of file
-# 	File.open("temp", "w") do |temp|
-# 		temp.write(summarize_post(post))
-# 		temp.write(File.read(File_Name))
-# 		File.delete(File_Name)
-# 		File.rename("temp", File_Name)
-# 	end
-# end
 def remove_post_and_pm(post)
 	# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
 	# post.author.send_message(subject: ("r/" + $Subreddit + " post has been removed"),
@@ -116,9 +106,9 @@ def get_names_and_times_in_downtime(data_arr)
 	names = []
 	times = []
 	for i in 0..data_arr.length
-		if i % 6 == 0
+		if i % 7 == 0
 			names.push data_arr[i]
-		elsif i % 6 == 1
+		elsif i % 7 == 1
 			times.push data_arr[i].to_i
 			break if post_time - pushme >= $Post_Downtime
 		end
@@ -139,12 +129,12 @@ loop do
 
 	$Session.subreddit($Subreddit).search('*', sort: :new, limit: 1)\
 		.reverse_each do |post|
-
-	end
-
-	if $Post_Downtime >= 0
-		names_in_downtime = get_names_in_downtime(data_arr)
-		times_in_downtime = get_times_in_downtime(data_arr)
+		#TODO log posts
+		if $Post_Downtime >= 0
+			#TODO check #Post_Downtime violation
+			names_in_downtime = get_names_in_downtime(data_arr)
+			times_in_downtime = get_times_in_downtime(data_arr)
+		end
 	end
 end
 
