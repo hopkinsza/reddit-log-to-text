@@ -124,6 +124,7 @@ loop do
 
 	# log posts since latest logged post, oldest first
 	begin
+	data_arr = File.readlines(File_Name)
 	latest_id = data_arr[2]
 	log_me = ""
 	$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
@@ -147,7 +148,7 @@ loop do
 			if i % 7 == 0
 				names.push data_arr[i]
 			elsif i % 7 == 1
-				times.push data_arr[i]
+				times.push data_arr[i].to_i
 			elsif i % 7 == 2
 				ids.push data_arr[i]
 			end
@@ -160,7 +161,7 @@ loop do
 			for j in i...names.length
 				next if i == j
 				if (names[i] == names[j]) && (times[i] - times[j] < $Post_Downtime)
-					post = Submission.from_id(ids[j])
+					post = Redd::Models::Submission.from_id($Session.client, ids[j])
 					puts; remove_post_and_pm(post)
 					names.delete_at(j)
 					times.delete_at(j)
