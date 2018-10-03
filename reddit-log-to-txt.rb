@@ -69,13 +69,22 @@ if File.exist?(File_Name)
 	puts "./#{File_Name} found"
 else
 	print "populating ./#{File_Name} with 100 initial entries..."
-	str = ""
+	arr_to_write = []
 	$Session.subreddit($Subreddit).search("*", sort: :new, limit: 100)\
 		.each do |submission|
-		str += summarize_post(submission)
+		arr_to_write.push summarize_post(submission)
 	end
 	File.open(File_Name, "a") do |f|
-		f.write(str)
+		arr_to_write.each do |str|
+			f.write(str)
+		end
+	end
+
+	File.open(File_Name + "-line", "a") do |f|
+		# $File_Name + "-line" is the line num of the blank
+		# line after the oldest post we need to check
+		# for $Post_Downtime violations
+		f.write((arr_to_write.length * 7) - 1)
 	end
 	puts " [done]"
 end
@@ -84,12 +93,12 @@ end
 # Load posts every 3 minutes, log them,
 # delete if they violate $Post_Downtime
 #######################################
-def log_to_top_of_file(text)
+def log_to_top_of_file(file_name, text)
 	File.open("temp", "w") do |temp|
 		temp.write(text)
-		temp.write(File.read(File_Name))
-		File.delete(File_Name)
-		File.rename("temp", File_Name)
+		temp.write(File.read(file_name))
+		File.delete(file_name)
+		File.rename("temp", file_name)
 	end
 end
 def remove_post_and_pm(post)
@@ -100,72 +109,78 @@ def remove_post_and_pm(post)
 	# 						 of your last submission.",
 	# 						 from: nil)
 	# post.remove(spam: false)
-end
-def get_names_in_downtime(data_arr)
-	#TODO wtf is going on here
-	names = []
-	for i in 0..data_arr.length
-		if i % 7 == 0
-			names.push data_arr[i]
-		elsif i % 7 == 1
-			time = data_arr[i].to_i
-			break if post_time - time >= $Post_Downtime
-		end
-	end
-
-	return names
+	puts "removed post:"
+	puts "author: #{post.author.name}"
+	puts "time  : #{post.created_utc}"
+	puts "title : #{post.title}"
+	puts
 end
 
-# repeats every 5 minites, infinitely
-print "fetching posts..."
+# repeats every 5 minutes, infinitely
 loop do
-	data_arr = File.read(File_Name).split("\n")
+	print "fetching posts..."
 
-	# data of latest logged post
-	latest_name = data_arr[0]
-	latest_time = data_arr[1]
-	latest_id   = data_arr[2]
-
-	# violating posts *within this post grab* will be
-	# removed, if $Post_Downtime is set. Otherwise, this
-	# variable is not used.
-	unique_names = []
-	unique_times = []
-	# get posts since latest logged post, oldest first
-	$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
+	# log posts since latest logged post, oldest first
+	{
+	log_me = ""
+	$Session.subreddit($Subreddit).search('all', sort: :new, after: data_arr[2])\
 		.reverse_each do |post|
-		log_to_top_of_file(summarize_post(post))
-
-		# TODO redo this completely in a smarter way. we will log the files first,
-		# then check the FILE for $Post_Downtime violations.
-		# if $Post_Downtime >= 0
-		# 	post_name = post.author.name
-		# 	#TODO check $Post_Downtime violation
-		# 	# check against posts from this post grab
-		# 	unique = true
-		# 	for i in 0..unique_names.length
-		# 		if post_name == unique_names[i]
-		# 			unique = false
-		# 		end
-		# 	end
-		# 	if unique
-		# 		if post
-		# 		unique_names.push post_name
-		# 		unique_times.push post.created_utc.to_i
-		# 	end
-
-		# 	#TODO
-		# 	# check against already logged posts
-		# 	names_in_downtime = get_names_in_downtime(data_arr)
-		# 	for i in 0..names_in_downtime.length
-		# 		if 
-		# 		end
-		# 	end
-		# end
+		log_me += summarize_post(post)
 	end
+	log_to_top_of_file(File_Name, log_me)
+	}
+
+	# check logged posts for $Post_Downtime violations
+	if $Post_Downtime >= 0
+		data_arr = File.readlines(File_Name)
+		# get info from necessary logged posts to test
+		checkline = File.read(File_Name + "-line").to_i
+		names = []
+		times = []
+		ids   = []
+		for i in 0..checkline
+			if i % 7 == 0
+				names.push data_arr[i]
+			elsif i % 7 == 1
+				times.push data_arr[i]
+			elsif i % 7 == 2
+				ids.push data_arr[i]
+			end
+		end
+		# test them, remove post & remove from arrays
+		# if violates $Post_Downtime
+		for i in 0...names.length
+			for j in i...names.length
+				next if i == j
+				if (names[i] == names[j]) && (times[i] - times[j] < $Post_Downtime)
+					post = Submission.from_id(ids[j])
+					puts; remove_post_and_pm(post)
+					names.delete_at(j)
+					times.delete_at(j)
+					ids.delete_at(j)
+				end
+			end
+		end
+		# set File_Name + "-line" again
+		{
+		last_logged_time = data_arr[1]
+		new_line = 0
+		for i in 0...data_arr.length
+			if (i % 7 == 1) && (last_logged_time - data_arr[i] > $Post_Downtime)
+				new_line = i + 5
+			end
+		end
+		if new_line == 0
+			# default to first ever logged post
+			new_line = data_arr.length - 1
+		end
+		}
+		File.write(File_Name + "-line", new_line.to_s)
+	end
+
+	puts " [done]"
 	sleep 300
 end
-puts " [done]"
 
 # $Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
 # 	.each do |submission|

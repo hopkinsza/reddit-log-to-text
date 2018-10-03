@@ -13,9 +13,13 @@ $Session = Redd.it(
 
 # this will change settings on the account you give the bot
 # specifically, :over_18=>true :search_include_over_18=>true
+#
+# If this is not set to true, the bot will not be able to
+# view nsfw posts
 $Over_18_and_View_NSFW = false
 
 # r/$Subreddit
+# the subreddit you want to log, *without* the 'r/' prefix
 $Subreddit = ''
 
 # If a user posts twice within this number of seconds, their
@@ -23,8 +27,4 @@ $Subreddit = ''
 # A value of 0 means this feature is not used.
 #
 # Obviously, the bot must be an admin in the subreddit to do this.
-#
-# (note: A value <= 300 (other than 0) will not work. This has
-# to do with the fact that the script checks for new posts every
-# 300 seconds.)
 $Post_Downtime = 0
