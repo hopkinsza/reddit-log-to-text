@@ -85,15 +85,16 @@ else
 		# $File_Name + "-line" is the line num of the blank
 		# line after the oldest post we need to check
 		# for $Post_Downtime violations
-		f.write((arr_to_write.length * 7) - 1)
+		f.write((arr_to_write.length * 7))
 	end
 	puts " [done]"
 end
 
 ################################################
-# Load posts every 3 minutes, log them,
-# delete if they violate $Post_Downtime
-#######################################
+# Delete logged posts if they violate
+# $Post_Downtime.
+# Load posts every 3 minutes log them.
+######################################
 def log_to_top_of_file(file_name, text)
 	File.open("temp", "w") do |temp|
 		temp.write(text)
@@ -120,21 +121,7 @@ end
 # repeats every 5 minutes, infinitely
 # (until stopped with ^C)
 loop do
-	print "fetching posts..."
-
-	# log posts since latest logged post, oldest first
-	begin
-	data_arr = File.readlines(File_Name)
-	latest_id = data_arr[2]
-	log_me = ""
-	$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
-		.reverse_each do |post|
-		log_me += summarize_post(post)
-	end
-	log_to_top_of_file(File_Name, log_me)
-	end
-
-	# check logged posts for $Post_Downtime violations
+	print "checking logged posts for $Post_Downtime violations..."
 	if $Post_Downtime >= 0
 		data_arr = File.readlines(File_Name)
 		# get info from necessary logged posts to test,
@@ -143,56 +130,63 @@ loop do
 		names = []
 		times = []
 		ids   = []
-		i = checkline
-		while i >= 0
-			if i % 7 == 0
-				names.push data_arr[i]
-			elsif i % 7 == 1
-				times.push data_arr[i].to_i
-			elsif i % 7 == 2
-				ids.push data_arr[i]
+		begin
+			i = checkline - 1
+			while i >= 0
+				if i % 7 == 0
+					names.push data_arr[i]
+				elsif i % 7 == 1
+					times.push data_arr[i].to_i
+				elsif i % 7 == 2
+					ids.push data_arr[i]
+				end
+				i -= 1
 			end
-			i -= 1
 		end
 
-		# test them, remove post & remove from arrays
+		# test logged posts, remove post & ignore in array
 		# if it violates $Post_Downtime
 		for i in 0...names.length
 			for j in i...names.length
 				next if i == j
-				if (names[i] == names[j]) && (times[i] - times[j] < $Post_Downtime)
+				if (names[i] == names[j]) && (times[i] - times[j] < $Post_Downtime) && (names[i] != "")
 					post = Redd::Models::Submission.from_id($Session.client, ids[j])
 					puts; remove_post_and_pm(post)
-					names.delete_at(j)
-					times.delete_at(j)
-					ids.delete_at(j)
+					names[i] = ""
 				end
 			end
 		end
 
 		# set File_Name + "-line" again
 		begin
-		last_logged_time = data_arr[1]
-		new_line = 0
-		for i in 0...data_arr.length
-			if (i % 7 == 1) && (last_logged_time - data_arr[i] > $Post_Downtime)
-				new_line = i + 5
+			last_logged_time = data_arr[1].to_i
+			new_line = 0
+			for i in 0...data_arr.length
+				if (i % 7 == 1) && (last_logged_time - data_arr[i].to_i > $Post_Downtime)
+					new_line = i + 5
+				end
 			end
+			if new_line == 0
+				# default to first ever logged post
+				new_line = data_arr.length - 1
+			end
+			File.write(File_Name + "-line", new_line.to_s)
 		end
-		if new_line == 0
-			# default to first ever logged post
-			new_line = data_arr.length - 1
-		end
-		end
-		File.write(File_Name + "-line", new_line.to_s)
 	end
+	puts " [done]"
 
+	print "fetching new posts..."
+	# log posts since latest logged post, oldest first
+	begin
+		data_arr = File.readlines(File_Name)
+		latest_id = data_arr[2]
+		log_me = ""
+		$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
+			.reverse_each do |post|
+			log_me += summarize_post(post)
+		end
+		log_to_top_of_file(File_Name, log_me)
+	end
 	puts " [done]"
 	sleep 300
 end
-
-# $Session.subreddit($Subreddit).search('linux', sort: :new, limit: 1)\
-# 	.each do |submission|
-# 	puts
-# 	puts summarize_post(submission)
-# end
