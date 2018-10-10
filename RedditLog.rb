@@ -1,18 +1,19 @@
 class RedditLog
 	# Assumes these are defined:
 	# $Session, a redd session
-	# $Subreddit, the subreddit to log
 	# $Post_Downtime
 	#
 	##############################################
-	# #new: load or create and populate log file
+	# File things
+	# #new(subreddit): load or create and populate log file
 	# #log: log text to top of the file
 	# #fetch_new_posts: fetch and log new posts
 	################################
 	# Load file, populate if empty
 	def new(subreddit)
+		@subreddit = subreddit
 		# the file containing data
-		@file_name = $Subreddit + '-data'
+		@file_name = @subreddit + '-data'
 		# file containing the line num.
 		# of the blank line after the oldest relevant post
 		# to check for $Post_Downtime violations
@@ -25,7 +26,7 @@ class RedditLog
 			print "populating ./#{@file_name} with up to 100 initial entries..."
 			arr_to_write = []
 
-			$Session.subreddit($Subreddit).search('all', sort: :new, limit: 100)\
+			$Session.subreddit(@subreddit).search('all', sort: :new, limit: 100)\
 				.each do |submission|
 				arr_to_write.push summarize_post(submission)
 			end
@@ -58,7 +59,7 @@ class RedditLog
 			data_arr = File.readlines(File_Name)
 			latest_id = data_arr[2]
 			log_me = ""
-			$Session.subreddit($Subreddit).search('all', sort: :new, after: latest_id)\
+			$Session.subreddit(@subreddit).search('all', sort: :new, after: latest_id)\
 				.reverse_each do |post|
 				log_me += summarize_post(post)
 			end
@@ -66,13 +67,39 @@ class RedditLog
 		end
 		puts " [done]"
 	end
+	##############################################
+	# summarize_post
+	################
+	private
+	def local_and_utc(secs)
+		return Time.at(secs).to_datetime.to_s + "; UTC " + DateTime.strptime(secs.to_s, "%s").to_s
+	end
+	public
+	# post = Submission in Redd documentation
+	def self.summarize_post(post)
+		# author
+		# [time in seconds]
+		# id
+		# [LocalTime]; UTC [Time]
+		# title
+		# selftext on one line
+		str = post.author.name + "\n"
+		secs = post.created_utc.to_i
+		str += secs.to_s + "\n"
+		str += post.id + "\n"
+		str += local_and_utc(secs) + "\n"
+		str += post.title + "\n"
+		str += post.selftext.gsub(/\n/, "")
+		str += "\n\n"
+		return str
+	end
 
 	##############################################
 	# $Post_Downtime things
 	#######################
 	def self.remove_post_and_pm(post)
 		# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
-		# post.author.send_message(subject: ("r/" + $Subreddit + " post has been removed"),
+		# post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
 		# 						 text: "Your post, \"#{post.title}\", has been removed
 		# 						 for being posted within #{$Post_Downtime} seconds
 		# 						 of your last submission.",
