@@ -10,7 +10,7 @@ class RedditLog
 	# #fetch_new_posts: fetch and log new posts
 	################################
 	# Load file, populate if empty
-	def new(subreddit)
+	def initialize(subreddit)
 		@subreddit = subreddit
 		# the file containing data
 		@file_name = @subreddit + '-data'
@@ -56,7 +56,7 @@ class RedditLog
 		print "fetching new posts..."
 		# log posts since latest logged post, oldest first
 		begin
-			data_arr = File.readlines(File_Name)
+			data_arr = File.readlines(@file_name)
 			latest_id = data_arr[2]
 			log_me = ""
 			$Session.subreddit(@subreddit).search('all', sort: :new, after: latest_id)\
@@ -74,9 +74,8 @@ class RedditLog
 	def local_and_utc(secs)
 		return Time.at(secs).to_datetime.to_s + "; UTC " + DateTime.strptime(secs.to_s, "%s").to_s
 	end
-	public
 	# post = Submission in Redd documentation
-	def self.summarize_post(post)
+	def summarize_post(post)
 		# author
 		# [time in seconds]
 		# id
@@ -93,11 +92,12 @@ class RedditLog
 		str += "\n\n"
 		return str
 	end
-
+	public
 	##############################################
 	# $Post_Downtime things
 	#######################
-	def self.remove_post_and_pm(post)
+	private
+	def remove_post_and_pm(post)
 		# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
 		# post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
 		# 						 text: "Your post, \"#{post.title}\", has been removed
@@ -111,6 +111,7 @@ class RedditLog
 		puts "title : #{post.title}"
 		puts
 	end
+	public
 
 	def check_violations
 		print "checking logged posts for $Post_Downtime violations..."
