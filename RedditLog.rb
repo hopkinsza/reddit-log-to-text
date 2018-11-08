@@ -99,12 +99,11 @@ class RedditLog
 	private
 	def remove_post_and_pm(post)
 		# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
-		# post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
-		# 						 text: "Your post, \"#{post.title}\", has been removed
-		# 						 for being posted within #{$Post_Downtime} seconds
-		# 						 of your last submission.",
-		# 						 from: nil)
-		# post.remove(spam: false)
+		post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
+			text: "Your post, \"#{post.title}\", has been removed for being posted within #{$Post_Downtime} seconds of your last submission.",
+			from: nil)
+
+		post.remove(spam: false)
 		puts "removed post:"
 		puts "author: #{post.author.name}"
 		puts "time  : #{post.created_utc}"
