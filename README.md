@@ -2,14 +2,21 @@
 Simple script to log reddit posts using the *Redd* API for Ruby.
 
 
-__Prerequisites__:
+**Prerequisites**:
 
 `[package manager] install ruby`
 
-`gem install redd` or `gem install bundler && bundle install`
+use `git clone` to pull down this repository
 
+(inside the project directory) install dependencies:
 
-__Instructions__:
+`gem install --user-install bundler && bundle install`
+
+or install them manually:
+
+`gem install --user-install redd`
+
+**Instructions**:
 
 Modify `example-env.rb` and save as `env.rb`
 
