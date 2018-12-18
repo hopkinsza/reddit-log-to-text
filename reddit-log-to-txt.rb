@@ -45,8 +45,7 @@ reddit_log = RedditLog.new($Subreddit)
 ################################################
 # Delete logged posts if they violate
 # $Post_Downtime.
-# Load posts every 3 minutes log them.
-######################################
+#################
 #
 # repeats every 5 minutes, infinitely
 # (until stopped with ^C)

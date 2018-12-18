@@ -1,4 +1,5 @@
 class RedditLog
+	public
 	# Assumes these are defined:
 	# $Session, a redd session
 	# $Post_Downtime
@@ -6,7 +7,7 @@ class RedditLog
 	##############################################
 	# File things
 	# #new(subreddit): load or create and populate log file
-	# #log: log text to top of the file
+	# #log: log text to botton of the file
 	# #fetch_new_posts: fetch and log new posts
 	################################
 	# Load file, populate if empty
@@ -26,8 +27,7 @@ class RedditLog
 			print "populating ./#{@file_name} with up to 100 initial entries..."
 			arr_to_write = []
 
-			$Session.subreddit(@subreddit).search('all', sort: :new, limit: 100)\
-				.each do |submission|
+			$Session.subreddit(@subreddit).search('all', sort: :new, limit: 100).reverse_each do |submission|
 				arr_to_write.push summarize_post(submission)
 			end
 			File.open(@file_name, "a") do |f|
@@ -35,29 +35,20 @@ class RedditLog
 					f.write(str)
 				end
 			end
-
+			# record line
 			File.open(@line_file_name, "a") do |f|
-				f.write((arr_to_write.length * 7))
+				f.write("0")
 			end
 			puts " [done]"
 		end
 	end
 
-	# logs text to top of file
-	def log(text)
-		File.open("temp", "w") do |temp|
-			temp.write(text)
-			temp.write(File.read(@file_name))
-			File.delete(@file_name)
-			File.rename("temp", @file_name)
-		end
-	end
 	def fetch_new_posts
 		print "fetching new posts..."
 		# log posts since latest logged post, oldest first
 		begin
 			data_arr = File.readlines(@file_name)
-			latest_id = data_arr[2]
+			latest_id = data_arr[data_arr.length - 4]
 			log_me = ""
 			$Session.subreddit(@subreddit).search('all', sort: :new, after: latest_id)\
 				.reverse_each do |post|
@@ -67,54 +58,10 @@ class RedditLog
 		end
 		puts " [done]"
 	end
-	##############################################
-	# summarize_post
-	################
-	private
-	def local_and_utc(secs)
-		return Time.at(secs).to_datetime.to_s + "; UTC " + DateTime.strptime(secs.to_s, "%s").to_s
-	end
-	# post = Submission in Redd documentation
-	def summarize_post(post)
-		# author
-		# [time in seconds]
-		# id
-		# [LocalTime]; UTC [Time]
-		# title
-		# selftext on one line
-		str = post.author.name + "\n"
-		secs = post.created_utc.to_i
-		str += secs.to_s + "\n"
-		str += post.id + "\n"
-		str += local_and_utc(secs) + "\n"
-		str += post.title + "\n"
-		str += post.selftext.gsub(/\n/, "")
-		str += "\n\n"
-		return str
-	end
-	public
-	##############################################
-	# $Post_Downtime things
-	#######################
-	private
-	def remove_post_and_pm(post)
-		# TODO REMEMBER TO UNCOMMENT THIS FOR PRODUCTION
-		post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
-			text: "Your post, \"#{post.title}\", has been removed for being posted within #{$Post_Downtime} seconds of your last submission.",
-			from: nil)
-
-		post.remove(spam: false)
-		puts "removed post:"
-		puts "author: #{post.author.name}"
-		puts "time  : #{post.created_utc}"
-		puts "title : #{post.title}"
-		puts
-	end
-	public
 
 	def check_violations
-		print "checking logged posts for $Post_Downtime violations..."
 		if $Post_Downtime >= 0
+			print "checking logged posts for $Post_Downtime violations..."
 			data_arr = File.readlines(@file_name)
 			# get info from necessary logged posts to test,
 			# sorted oldest first
@@ -123,8 +70,8 @@ class RedditLog
 			times = []
 			ids   = []
 			begin
-				i = checkline - 1
-				while i >= 0
+				i = checkline
+				while i <= data_arr.length
 					if i % 7 == 0
 						names.push data_arr[i]
 					elsif i % 7 == 1
@@ -132,7 +79,7 @@ class RedditLog
 					elsif i % 7 == 2
 						ids.push data_arr[i]
 					end
-					i -= 1
+					i += 1
 				end
 			end
 
@@ -149,22 +96,77 @@ class RedditLog
 				end
 			end
 
-			# set @file_name + "-line" again
+			# set @line_file_name again
 			begin
-				last_logged_time = data_arr[1].to_i
+				# default to oldest post
 				new_line = 0
-				for i in 0...data_arr.length
+
+				last_logged_time = data_arr[data_arr.length - 6].to_i
+				i = data_arr.length - 6
+				while i >= 1
 					if (i % 7 == 1) && (last_logged_time - data_arr[i].to_i > $Post_Downtime)
-						new_line = i + 5
+						new_line = i - 1
 					end
+					i -= 7
 				end
-				if new_line == 0
-					# default to first ever logged post
-					new_line = data_arr.length - 1
-				end
+
 				File.write(@line_file_name, new_line.to_s)
 			end
+		else
+			print "skipping $Post_Downtime checks..."
 		end
 		puts " [done]"
+	end
+
+	private
+	##############################################
+	# private methods
+	#
+	# #log(text)
+	# log to bottom of file
+	#######################
+	def log(text)
+		File.open(@file_name, "a") do |f|
+			f.write(text)
+		end
+	end
+
+	def local_and_utc(secs)
+		return Time.at(secs).to_datetime.to_s + "; UTC " + DateTime.strptime(secs.to_s, "%s").to_s
+	end
+	# post = Submission in Redd documentation
+	def summarize_post(post)
+		# author
+		# [time in seconds]
+		# id
+		# [LocalTime]; UTC [Time]
+		# title
+		# selftext on one line
+		# 
+		str = post.author.name + "\n"
+		secs = post.created_utc.to_i
+		str += secs.to_s + "\n"
+		str += post.id + "\n"
+		str += local_and_utc(secs) + "\n"
+		str += post.title + "\n"
+		str += post.selftext.gsub(/\n/, "") + "\n"
+		str += "\n"
+		return str
+	end
+	##############################################
+	# $Post_Downtime things
+	#######################
+	private
+	def remove_post_and_pm(post)
+		post.author.send_message(subject: ("r/" + @subreddit + " post has been removed"),
+			text: "Your post, \"#{post.title}\", has been removed for being posted within #{$Post_Downtime} seconds of your last submission.",
+			from: nil)
+
+		post.remove(spam: false)
+		puts "removed post:"
+		puts "author: #{post.author.name}"
+		puts "time  : #{post.created_utc}"
+		puts "title : #{post.title}"
+		puts
 	end
 end
