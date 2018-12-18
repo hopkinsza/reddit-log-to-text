@@ -1,22 +1,31 @@
 # reddit-log-to-txt
 Simple script to log reddit posts using the *Redd* API for Ruby.
 
+---
 
-**Prerequisites**:
+## Prerequisites
 
-`[package manager] install ruby`
+**install ruby and git, pull this repo**
+
+`[package manager] install ruby git`
 
 use `git clone` to pull down this repository
 
-(inside the project directory) install dependencies:
+**install redd**
 
-`gem install --user-install bundler && bundle install`
-
-or install them manually:
+`cd ~/reddit-log-to-text`
 
 `gem install --user-install redd`
 
-**Instructions**:
+this will give a warning about some path like `/home/$USER/.gem/ruby/$VERSION/bin` not being in your PATH; add it permanently with the following steps:
+
+- copy the path from the warning (using ctrl+shift+c)
+- run `echo "export PATH=$PATH:/the/path/you/copied" >> ~/.bashrc` (paste using ctrl+shift+v)
+- run `source ~/.bashrc`
+
+---
+
+## Usage Instructions
 
 Modify `example-env.rb` and save as `env.rb`
 
