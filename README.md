@@ -1,4 +1,5 @@
 # reddit-log-to-txt
+
 Simple script to log reddit posts using the *Redd* API for Ruby.
 
 ---
